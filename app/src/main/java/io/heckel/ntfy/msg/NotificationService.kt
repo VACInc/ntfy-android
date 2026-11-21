@@ -120,6 +120,11 @@ class NotificationService(val context: Context) {
 
     private fun maybeSetSmallIcon(builder: NotificationCompat.Builder, notification: Notification) {
         val smallIcon = notification.smallIcon ?: return
+        if (smallIcon == HOME_ASSISTANT_ICON) {
+            // The MDI glyph is Home Assistant's retired logo; use the HA companion app's own status-bar icon.
+            builder.setSmallIcon(R.drawable.ic_notification_home_assistant)
+            return
+        }
         try {
             val sizePx = (SMALL_ICON_SIZE_DP * context.resources.displayMetrics.density).roundToInt()
             val bitmap = MaterialDesignIcons.render(context, smallIcon, sizePx) ?: return // Unknown icon, keep the default icon
@@ -543,6 +548,7 @@ class NotificationService(val context: Context) {
     }
 
     companion object {
+        private const val HOME_ASSISTANT_ICON = "mdi:home-assistant"
         const val ACTION_VIEW = "view"
         const val ACTION_HTTP = "http"
         const val ACTION_BROADCAST = "broadcast"
