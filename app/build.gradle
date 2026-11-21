@@ -13,12 +13,15 @@ android {
     compileSdkVersion 36
 
     defaultConfig {
-        applicationId "io.heckel.ntfy"
+        // VAC fork: fixed app identity forever. A distinct id installs beside the Play/F-Droid ntfy app
+        // (io.heckel.ntfy) instead of replacing it. Never change it: a new id is a new app.
+        applicationId "us.vacinc.ntfy"
         minSdkVersion 26
         targetSdkVersion 36
 
-        versionCode 63
-        versionName "1.25.2"
+        // upstream versionCode * 100 + fork build, so every fork build and upstream rebase sorts newer.
+        versionCode 6301
+        versionName "1.25.2-vac1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -32,11 +35,27 @@ android {
         }
     }
 
+    // VAC fork release key (1Password TARS Write "ntfy fork signing key"); only when the build passes it in.
+    signingConfigs {
+        vac {
+            if (System.getenv("NTFY_KEYSTORE")) {
+                storeFile file(System.getenv("NTFY_KEYSTORE"))
+                storeType "PKCS12"
+                storePassword System.getenv("NTFY_KEYSTORE_PASSWORD")
+                keyAlias "ntfy"
+                keyPassword System.getenv("NTFY_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             shrinkResources false
             debuggable false
+            if (System.getenv("NTFY_KEYSTORE")) {
+                signingConfig signingConfigs.vac
+            }
             // DEV/TEST ONLY: Uncomment this to test the release build with a debug key.
             //                This is required to test against the production Firebase config.
             // signingConfig signingConfigs.debug
