@@ -10,6 +10,7 @@ import android.media.AudioManager
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Bundle
+import android.widget.RemoteViews
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -167,7 +168,27 @@ class NotificationService(val context: Context) {
         val subscriptionIcon = subscription.icon?.readBitmapFromUriOrNull(context)
         val notificationIcon = notification.icon?.contentUri?.readBitmapFromUriOrNull(context)
         val largeIcon = notificationIcon ?: subscriptionIcon
-        if (contentUri != null && isSupportedImage) {
+        val gifFrames = if (contentUri != null && notification.attachment?.type == "image/gif") {
+            GifFrames.decode(context, contentUri.toUri())
+        } else {
+            null
+        }
+        if (gifFrames != null) {
+            // VAC fork: Android cannot animate a notification picture, so flip through the GIF's frames.
+            val text = maybeAppendActionErrors(maybeMarkdown(formatMessage(notification), notification), notification)
+            val flipper = RemoteViews(context.packageName, R.layout.notification_gif_flipper)
+            flipper.setTextViewText(R.id.gif_text, text)
+            gifFrames.forEach { frame ->
+                flipper.addView(R.id.gif_flipper, RemoteViews(context.packageName, R.layout.notification_gif_frame).apply {
+                    setImageViewBitmap(R.id.gif_frame, frame)
+                })
+            }
+            builder
+                .setContentText(text)
+                .setLargeIcon(gifFrames.first())
+                .setCustomBigContentView(flipper)
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+        } else if (contentUri != null && isSupportedImage) {
             try {
                 val attachmentBitmap = contentUri.readBitmapFromUri(context)
                 builder

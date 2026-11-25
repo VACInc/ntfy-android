@@ -20,8 +20,8 @@ android {
         targetSdkVersion 36
 
         // upstream versionCode * 100 + fork build, so every fork build and upstream rebase sorts newer.
-        versionCode 6302
-        versionName "1.25.2-vac2"
+        versionCode 6303
+        versionName "1.25.2-vac3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -106,6 +106,7 @@ android.applicationVariants.all { variant ->
 }
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     // AndroidX, The Basics
     implementation "androidx.appcompat:appcompat:1.7.1"
     implementation "androidx.core:core-ktx:1.18.0"

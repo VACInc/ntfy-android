@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VAC fork: animated GIF attachment in the expanded notification. flipInterval = GifFrames.STEP_MS. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/gif_text"
+        style="@style/TextAppearance.Compat.Notification.Info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="3"
+        android:textSize="14sp" />
+
+    <ViewFlipper
+        android:id="@+id/gif_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:autoStart="true"
+        android:flipInterval="200"
+        android:inAnimation="@null"
+        android:outAnimation="@null" />
+</LinearLayout>
