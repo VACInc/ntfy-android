@@ -20,8 +20,8 @@ android {
         targetSdkVersion 36
 
         // upstream versionCode * 100 + fork build, so every fork build and upstream rebase sorts newer.
-        versionCode 6303
-        versionName "1.25.2-vac3"
+        versionCode 6304
+        versionName "1.25.2-vac4"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 

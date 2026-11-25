@@ -7,14 +7,14 @@ import org.junit.Test
 class GifFramesTest {
     @Test
     fun shortGifIsSampledEveryStep() {
-        assertEquals(listOf(0, 200, 400, 600, 800), GifFrames.frameTimes(1000))
+        assertEquals(listOf(100, 300, 500, 700, 900), GifFrames.frameTimes(1000))
     }
 
     @Test
     fun longGifIsCappedAndSpreadOverTheWholeDuration() {
         val t = GifFrames.frameTimes(12000)
         assertEquals(GifFrames.MAX_FRAMES, t.size)
-        assertEquals(400, t[1])
+        assertEquals(500, t[1])
         assertTrue(t.last() >= 11000)
     }
 
@@ -27,9 +27,17 @@ class GifFramesTest {
 
     @Test
     fun framesAreScaledToMaxWidthKeepingAspect() {
-        assertEquals(Pair(400, 225), GifFrames.scaledSize(1280, 720))
+        assertEquals(Pair(480, 270), GifFrames.scaledSize(1280, 720))
         assertEquals(Pair(320, 180), GifFrames.scaledSize(320, 180))
         assertEquals(Pair(0, 0), GifFrames.scaledSize(0, 10))
+    }
+
+    @Test
+    fun haClipGifKeepsAllFourteenFrames() {
+        // HA builds 14 frames at 200 ms, 480x360: every frame sampled once and all fit the budget.
+        val t = GifFrames.frameTimes(2800)
+        assertEquals(listOf(100, 300, 500, 700, 900, 1100, 1300, 1500, 1700, 1900, 2100, 2300, 2500, 2700), t)
+        assertEquals(14, GifFrames.framesWithinBudget(480, 360, t.size))
     }
 
     @Test

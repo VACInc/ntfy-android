@@ -16,7 +16,7 @@ object GifFrames {
     /** Frame spacing in GIF time; must match android:flipInterval in notification_gif_flipper.xml. */
     const val STEP_MS = 200
     const val MAX_FRAMES = 30
-    const val MAX_WIDTH = 400
+    const val MAX_WIDTH = 480
     /** Total frame memory kept under the notification bitmap budget (HA uses the same 5 MB cap). */
     const val MAX_TOTAL_BYTES = 5_000_000
 
@@ -26,7 +26,8 @@ object GifFrames {
         val count = minOf(maxFrames, (durationMs + stepMs - 1) / stepMs)
         if (count < 2) return emptyList()
         val step = maxOf(stepMs, durationMs / count)
-        return List(count) { minOf(it * step, durationMs - 1) }
+        // Sample mid-frame so a GIF made at exactly stepMs per frame yields each frame once, never a boundary repeat.
+        return List(count) { minOf(it * step + stepMs / 2, durationMs - 1) }
     }
 
     /** Scaled (width, height) for a frame, never wider than maxWidth, aspect ratio kept. */
