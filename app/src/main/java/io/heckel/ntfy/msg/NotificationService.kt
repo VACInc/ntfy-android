@@ -88,7 +88,9 @@ class NotificationService(val context: Context) {
     private fun displayInternal(subscription: Subscription, notification: Notification, update: Boolean = false) {
         val title = formatTitle(appBaseUrl, subscription, notification)
         val groupId = if (subscription.dedicatedChannels) subscriptionGroupId(subscription) else DEFAULT_GROUP
-        val channelId = toChannelId(groupId, notification.priority)
+        val ha = HaHints.parse(splitTags(notification.tags))
+        val haChannelId = maybeCreateHaChannel(ha, notification.priority)
+        val channelId = haChannelId ?: toChannelId(groupId, notification.priority)
         val insistent = notification.priority == PRIORITY_MAX &&
                 (repository.getInsistentMaxPriorityEnabled() || subscription.insistent == Repository.INSISTENT_MAX_PRIORITY_ENABLED)
         val builder = NotificationCompat.Builder(context, channelId)
@@ -97,8 +99,10 @@ class NotificationService(val context: Context) {
             .setContentTitle(title)
             .setWhen(notification.timestamp * 1000) // Set timestamp (convert seconds to millis)
             .setShowWhen(true)
-            .setOnlyAlertOnce(true) // Do not vibrate or play sound if already showing (updates!)
-            .setAutoCancel(true) // Cancel when notification is clicked
+            // Updates (attachment download progress) never re-alert. A new message re-alerts like the HA app
+            // does, unless HA asked for alert_once.
+            .setOnlyAlertOnce(update || ha.alertOnce)
+            .setAutoCancel(!ha.sticky && !ha.persistent) // HA sticky: tapping does not dismiss
         maybeSetSmallIcon(builder, notification)
         maybeSetColor(builder, notification)
         setStyleAndText(builder, subscription, notification) // Preview picture or big text style
@@ -106,6 +110,7 @@ class NotificationService(val context: Context) {
         maybeSetDeleteIntent(builder, insistent)
         maybeSetSound(builder, insistent, update)
         maybeSetProgress(builder, notification)
+        applyHaHints(builder, ha, notification)
         maybeAddOpenAction(builder, notification)
         maybeAddBrowseAction(builder, notification)
         maybeAddDownloadAction(builder, notification)
@@ -113,7 +118,9 @@ class NotificationService(val context: Context) {
         maybeAddUserActions(builder, notification)
 
         maybeCreateNotificationGroup(groupId, subscriptionGroupName(subscription))
-        maybeCreateNotificationChannel(groupId, notification.priority)
+        if (haChannelId == null) {
+            maybeCreateNotificationChannel(groupId, notification.priority)
+        }
         maybePlayInsistentSound(groupId, insistent)
 
         notificationManager.notify(notification.notificationId, builder.build())
@@ -140,6 +147,74 @@ class NotificationService(val context: Context) {
         if (color.matches(COLOR_REGEX)) {
             builder.setColor(color.toColorInt())
         }
+    }
+
+    /** HA companion-app options (VAC fork): see HaHints. */
+    private fun applyHaHints(builder: NotificationCompat.Builder, ha: HaHints, notification: Notification) {
+        if (ha.persistent) {
+            builder.setOngoing(true)
+        }
+        ha.timeoutSeconds?.let { builder.setTimeoutAfter(it * 1000) }
+        when (ha.visibility) {
+            "public" -> builder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            "secret" -> builder.setVisibility(NotificationCompat.VISIBILITY_SECRET)
+            "private" -> builder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+        }
+        ha.group?.let { builder.setGroup("ha_" + it) }
+        ha.whenSeconds?.let { builder.setWhen(it * 1000).setShowWhen(true) }
+        if (ha.chronometer) {
+            builder.setUsesChronometer(true).setChronometerCountDown(ha.countdown)
+        }
+        val downloading = notification.attachment?.progress in 0..99
+        if (!downloading) {
+            if (ha.progressIndeterminate) {
+                builder.setProgress(0, 0, true)
+            } else if (ha.progress != null && ha.progressMax != null) {
+                builder.setProgress(ha.progressMax, ha.progress, false)
+            }
+        }
+    }
+
+    /** The HA notification channel for this message, created on first use like the HA app does; null if none. */
+    private fun maybeCreateHaChannel(ha: HaHints, priority: Int): String? {
+        val id = ha.channelId() ?: return null
+        val name = ha.channel ?: return null
+        if (notificationManager.getNotificationChannel(id) != null) {
+            return id
+        }
+        val importance = when (ha.importance) {
+            "min" -> NotificationManager.IMPORTANCE_MIN
+            "low" -> NotificationManager.IMPORTANCE_LOW
+            "high", "max" -> NotificationManager.IMPORTANCE_HIGH
+            "default" -> NotificationManager.IMPORTANCE_DEFAULT
+            else -> when (priority) {
+                PRIORITY_MIN -> NotificationManager.IMPORTANCE_MIN
+                PRIORITY_LOW -> NotificationManager.IMPORTANCE_LOW
+                PRIORITY_HIGH, PRIORITY_MAX -> NotificationManager.IMPORTANCE_HIGH
+                else -> NotificationManager.IMPORTANCE_DEFAULT
+            }
+        }
+        maybeCreateNotificationGroup(HA_CHANNEL_GROUP, "Home Assistant")
+        val channel = NotificationChannel(id, name, importance)
+        channel.group = HA_CHANNEL_GROUP
+        ha.vibration?.let {
+            channel.enableVibration(true)
+            channel.vibrationPattern = it
+        }
+        ha.led?.let {
+            channel.enableLights(true)
+            channel.lightColor = it.toColorInt()
+        }
+        if (priority == PRIORITY_MAX || ha.importance == "max") {
+            channel.setBypassDnd(true)
+        }
+        // A changed vibration or importance gets a new id (channels are immutable); drop the stale one.
+        val base = id.substringBeforeLast('_')
+        notificationManager.notificationChannels
+            .filter { it.id.startsWith("ha_") && it.id.substringBeforeLast('_') == base && it.id != id }
+            .forEach { notificationManager.deleteNotificationChannel(it.id) }
+        notificationManager.createNotificationChannel(channel)
+        return id
     }
 
     private fun maybeSetDeleteIntent(builder: NotificationCompat.Builder, insistent: Boolean) {
@@ -570,6 +645,7 @@ class NotificationService(val context: Context) {
 
     companion object {
         private const val HOME_ASSISTANT_ICON = "mdi:home-assistant"
+        private const val HA_CHANNEL_GROUP = "ha_channels"
         const val ACTION_VIEW = "view"
         const val ACTION_HTTP = "http"
         const val ACTION_BROADCAST = "broadcast"

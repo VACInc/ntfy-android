@@ -167,7 +167,12 @@ fun splitTags(tags: String?): List<String> {
 }
 
 fun toEmojis(tags: List<String>): List<String> {
-    return tags.mapNotNull { tag -> toEmoji(tag) }
+    return visibleTags(tags).mapNotNull { tag -> toEmoji(tag) }
+}
+
+/** Tags minus the hidden Home Assistant option tags (HaHints, VAC fork). */
+fun visibleTags(tags: List<String>): List<String> {
+    return tags.filterNot { HaHints.isHint(it.trim()) }
 }
 
 fun toEmoji(tag: String): String? {
@@ -175,7 +180,7 @@ fun toEmoji(tag: String): String? {
 }
 
 fun unmatchedTags(tags: List<String>): List<String> {
-    return tags.filter { tag -> toEmoji(tag) == null }
+    return visibleTags(tags).filter { tag -> toEmoji(tag) == null }
 }
 
 /**
